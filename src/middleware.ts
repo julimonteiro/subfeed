@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "experimental-edge";
+
 const SESSION_COOKIE = "subfeed_session";
 const PUBLIC_PATHS = ["/login", "/api/auth"];
 
 /**
- * Next.js 16 proxy (replaces the deprecated middleware convention).
- * Checks for the session cookie and redirects to /login if missing.
+ * Auth middleware -- checks for the session cookie and redirects to /login
+ * if missing. Uses Edge runtime for Cloudflare Workers compatibility.
  *
  * Does NOT access Cloudflare env -- the real password verification
  * happens in the /api/auth routes. The GET /api/auth endpoint
  * auto-grants a cookie when SITE_PASSWORD is not configured.
  */
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {

@@ -8,10 +8,9 @@ compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".worker-next"
 
 [[d1_databases]]
-binding = "DB"
+binding = "subfeed_db"
 database_name = "subfeed-db"
-database_id = "YOUR_D1_DATABASE_ID_HERE"
-migrations_dir = "migrations"
+database_id = "8ba63947-17b9-4d85-8da1-36a08f18c3ad"
 
 # Password protection (optional).
 # Set via: npx wrangler secret put SITE_PASSWORD
