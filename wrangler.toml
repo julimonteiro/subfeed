@@ -1,13 +1,15 @@
 #:schema node_modules/wrangler/config-schema.json
 
 name = "subfeed"
+main = ".open-next/worker.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Output directory for @opennextjs/cloudflare build
-pages_build_output_dir = ".open-next"
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
 
 [[d1_databases]]
-binding = "subfeed_db"
+binding = "DB"
 database_name = "subfeed-db"
 database_id = "8ba63947-17b9-4d85-8da1-36a08f18c3ad"
