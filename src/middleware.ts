@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "experimental-edge";
-
 const SESSION_COOKIE = "subfeed_session";
 const PUBLIC_PATHS = ["/login", "/api/auth"];
 
