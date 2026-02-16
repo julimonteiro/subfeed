@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAllChannels, getWatchedVideoIds } from "@/lib/db";
 import { fetchChannelFeed, type VideoEntry } from "@/lib/youtube";
 import { getCached, setCache } from "@/lib/cache";
+import { getMsUntilNextUpdate, getNextUpdateTime } from "@/lib/schedule";
 
 const FEED_CACHE_KEY = "aggregated_feed";
 
@@ -10,10 +11,13 @@ export async function GET() {
     const channels = await getAllChannels();
 
     if (channels.length === 0) {
-      return NextResponse.json([]);
+      return NextResponse.json({
+        videos: [],
+        nextUpdateAt: getNextUpdateTime().toISOString(),
+      });
     }
 
-    // Fetch feed (with cache) and watched IDs in parallel
+    // Fetch feed (with schedule-aware cache) and watched IDs in parallel
     let allVideos: (VideoEntry & { channelThumbnail: string | null })[];
 
     const cached = getCached<typeof allVideos>(FEED_CACHE_KEY);
@@ -42,7 +46,8 @@ export async function GET() {
             new Date(a.publishedAt).getTime()
         );
 
-      setCache(FEED_CACHE_KEY, allVideos);
+      // Cache until the next scheduled update window (8 AM or 8 PM BRT)
+      setCache(FEED_CACHE_KEY, allVideos, getMsUntilNextUpdate());
     }
 
     // Always fetch fresh watched status (not cached)
@@ -53,7 +58,10 @@ export async function GET() {
       watched: watchedIds.has(video.videoId),
     }));
 
-    return NextResponse.json(videosWithWatched);
+    return NextResponse.json({
+      videos: videosWithWatched,
+      nextUpdateAt: getNextUpdateTime().toISOString(),
+    });
   } catch (error) {
     console.error("Error fetching feed:", error);
     return NextResponse.json(

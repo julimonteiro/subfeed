@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteChannel, getChannelById } from "@/lib/db";
-import { invalidateCache } from "@/lib/cache";
+import { getCached, setCache } from "@/lib/cache";
+import { type VideoEntry } from "@/lib/youtube";
+import { getMsUntilNextUpdate } from "@/lib/schedule";
 
 export async function DELETE(
   _request: NextRequest,
@@ -24,7 +26,16 @@ export async function DELETE(
 
     await deleteChannel(channelId);
 
-    invalidateCache("aggregated_feed");
+    // Remove deleted channel's videos from the cache instead of invalidating it
+    type CachedVideo = VideoEntry & { channelThumbnail: string | null };
+    const cached = getCached<CachedVideo[]>("aggregated_feed");
+
+    if (cached) {
+      const filtered = cached.filter(
+        (v) => v.channelId !== channel.channel_id
+      );
+      setCache("aggregated_feed", filtered, getMsUntilNextUpdate());
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -21,42 +21,52 @@ interface Video {
   watched: boolean;
 }
 
-const AUTO_REFRESH_INTERVAL = 2 * 60 * 1000;
+interface FeedResponse {
+  videos: Video[];
+  nextUpdateAt: string;
+}
+
+function formatNextUpdate(iso: string): string {
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
 export default function TimelinePage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterMode>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [nextUpdateAt, setNextUpdateAt] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== "undefined") {
       return (localStorage.getItem("subfeed_view") as ViewMode) || "list";
     }
     return "list";
   });
-  const [newVideoCount, setNewVideoCount] = useState(0);
-  const pendingVideosRef = useRef<Video[] | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const [viewFading, setViewFading] = useState(false);
+  const [showNextUpdate, setShowNextUpdate] = useState(false);
+  const nextUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchFeed = useCallback(async (showRefresh = false) => {
-    if (showRefresh) setRefreshing(true);
-    else setLoading(true);
+  // Track whether this is the initial load (for staggered entry animation)
+  const hasAnimated = useRef(false);
+
+  const fetchFeed = useCallback(async () => {
+    setLoading(true);
     setError(null);
 
     try {
       const response = await fetch("/api/feed");
       if (!response.ok) throw new Error("Failed to fetch feed");
-      const data = (await response.json()) as Video[];
-      setVideos(data);
-      setNewVideoCount(0);
-      pendingVideosRef.current = null;
+      const data = (await response.json()) as FeedResponse;
+      setVideos(data.videos);
+      setNextUpdateAt(data.nextUpdateAt);
     } catch {
       setError("Could not load feed. Try again.");
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
@@ -93,7 +103,6 @@ export default function TimelinePage() {
     async (videoIds: string[]) => {
       if (videoIds.length === 0) return;
 
-      // Optimistic update
       setVideos((prev) =>
         prev.map((v) =>
           videoIds.includes(v.videoId) ? { ...v, watched: true } : v
@@ -108,7 +117,6 @@ export default function TimelinePage() {
         });
         if (!response.ok) throw new Error("Failed to batch update");
       } catch {
-        // Revert on failure
         setVideos((prev) =>
           prev.map((v) =>
             videoIds.includes(v.videoId) ? { ...v, watched: false } : v
@@ -119,8 +127,41 @@ export default function TimelinePage() {
     []
   );
 
+  // Unique channels for the channel filter bar (scoped to active watch-status filter)
+  const channels = useMemo(() => {
+    let source = videos;
+    if (filter === "unwatched") {
+      source = videos.filter((v) => !v.watched);
+    } else if (filter === "watched") {
+      source = videos.filter((v) => v.watched);
+    }
+
+    const seen = new Map<string, { channelId: string; channelName: string; channelThumbnail: string | null }>();
+    for (const v of source) {
+      if (!seen.has(v.channelId)) {
+        seen.set(v.channelId, {
+          channelId: v.channelId,
+          channelName: v.channelName,
+          channelThumbnail: v.channelThumbnail ?? null,
+        });
+      }
+    }
+    return Array.from(seen.values());
+  }, [videos, filter]);
+
+  // Reset selected channel if it no longer exists in the filtered list
+  useEffect(() => {
+    if (selectedChannel && !channels.some((ch) => ch.channelId === selectedChannel)) {
+      setSelectedChannel(null);
+    }
+  }, [channels, selectedChannel]);
+
   const filteredVideos = useMemo(() => {
     let result = videos;
+
+    if (selectedChannel) {
+      result = result.filter((v) => v.channelId === selectedChannel);
+    }
 
     if (filter === "unwatched") {
       result = result.filter((v) => !v.watched);
@@ -138,54 +179,40 @@ export default function TimelinePage() {
     }
 
     return result;
-  }, [videos, filter, searchQuery]);
+  }, [videos, filter, searchQuery, selectedChannel]);
 
+  // Initial load
   useEffect(() => {
     fetchFeed();
   }, [fetchFeed]);
 
-  // Auto-refresh: poll for new videos in the background
+  // Smart auto-reload: schedule a re-fetch when the next update window arrives
   useEffect(() => {
-    if (loading) return;
+    if (!nextUpdateAt) return;
 
-    const checkForNewVideos = async () => {
-      if (document.visibilityState === "hidden") return;
+    const ms = new Date(nextUpdateAt).getTime() - Date.now();
+    if (ms <= 0) return;
 
-      try {
-        const response = await fetch("/api/feed");
-        if (!response.ok) return;
-        const data = (await response.json()) as Video[];
+    // Add a small buffer (5 s) so the server cache has expired by the time we fetch
+    const timer = setTimeout(() => {
+      fetchFeed();
+    }, ms + 5000);
 
-        const currentIds = new Set(videos.map((v) => v.videoId));
-        const newVideos = data.filter((v) => !currentIds.has(v.videoId));
-
-        if (newVideos.length > 0) {
-          setNewVideoCount(newVideos.length);
-          pendingVideosRef.current = data;
-        }
-      } catch {
-        // Silent fail for background polling
-      }
-    };
-
-    const interval = setInterval(checkForNewVideos, AUTO_REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [loading, videos]);
-
-  const loadPendingVideos = useCallback(() => {
-    if (pendingVideosRef.current) {
-      setVideos(pendingVideosRef.current);
-      pendingVideosRef.current = null;
-      setNewVideoCount(0);
-    }
-  }, []);
+    return () => clearTimeout(timer);
+  }, [nextUpdateAt, fetchFeed]);
 
   const handleViewToggle = useCallback(() => {
-    setViewMode((prev) => {
-      const next = prev === "list" ? "grid" : "list";
-      localStorage.setItem("subfeed_view", next);
-      return next;
-    });
+    setViewFading(true);
+    setTimeout(() => {
+      setViewMode((prev) => {
+        const next = prev === "list" ? "grid" : "list";
+        localStorage.setItem("subfeed_view", next);
+        return next;
+      });
+      // Re-trigger entry animations for the new view
+      hasAnimated.current = false;
+      setTimeout(() => setViewFading(false), 30);
+    }, 200);
   }, []);
 
   const unwatchedCount = videos.filter((v) => !v.watched).length;
@@ -200,55 +227,9 @@ export default function TimelinePage() {
 
   return (
     <div>
-      {/* New videos banner (auto-refresh) */}
-      {newVideoCount > 0 && (
-        <button
-          onClick={loadPendingVideos}
-          className="flex w-full items-center justify-center border-b border-[var(--border)] bg-[var(--accent)]/10 py-2.5 text-[14px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20"
-        >
-          {newVideoCount} new {newVideoCount === 1 ? "video" : "videos"} -- Click to load
-        </button>
-      )}
-
-      {/* Load new posts bar */}
-      {!loading && videos.length > 0 && (
-        <button
-          onClick={() => fetchFeed(true)}
-          disabled={refreshing}
-          className="flex w-full items-center justify-center border-b border-[var(--border)] py-3 text-[14px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--bg-surface)] disabled:opacity-50"
-        >
-          {refreshing ? (
-            <span className="flex items-center gap-2">
-              <svg
-                className="h-4 w-4 animate-spin"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-              Updating...
-            </span>
-          ) : (
-            "Load new videos"
-          )}
-        </button>
-      )}
-
       {/* Toolbar: filters + actions */}
       {!loading && videos.length > 0 && (
-        <div className="border-b border-[var(--border)]">
+        <div className="animate-feed-in border-b border-[var(--border)]">
           <div className="flex items-center px-4 sm:px-0">
             {/* Filter pills */}
             <div className="flex flex-1 items-center gap-1 py-2">
@@ -256,7 +237,7 @@ export default function TimelinePage() {
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+                  className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors duration-200 ${
                     filter === f.key
                       ? "bg-[var(--accent)] text-white"
                       : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
@@ -279,6 +260,42 @@ export default function TimelinePage() {
             </div>
 
             <div className="flex items-center gap-1">
+              {/* Next update indicator */}
+              {nextUpdateAt && (
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setShowNextUpdate((prev) => !prev);
+                      if (nextUpdateTimer.current) clearTimeout(nextUpdateTimer.current);
+                      nextUpdateTimer.current = setTimeout(() => setShowNextUpdate(false), 3000);
+                    }}
+                    className="flex h-8 items-center gap-1 rounded-full px-2 text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface)] hover:text-[var(--text-secondary)] sm:pointer-events-none"
+                    title={`Next feed update at ${formatNextUpdate(nextUpdateAt)}`}
+                  >
+                    <svg
+                      className="h-[14px] w-[14px]"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    <span className="hidden sm:inline">
+                      {formatNextUpdate(nextUpdateAt)}
+                    </span>
+                  </button>
+                  {showNextUpdate && (
+                    <div className="absolute right-0 top-full z-50 mt-1 whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] text-[var(--text-secondary)] shadow-lg sm:hidden">
+                      Update at {formatNextUpdate(nextUpdateAt)}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Mark all as watched */}
               {unwatchedInView.length > 0 && (
                 <button
@@ -371,9 +388,64 @@ export default function TimelinePage() {
             </div>
           </div>
 
-          {/* Search bar (collapsible) */}
-          {searchOpen && (
-            <div className="border-t border-[var(--border)] px-4 py-2 sm:px-0">
+          {/* Channel filter bar */}
+          {channels.length >= 2 && (
+            <div className="border-t border-[var(--border)] px-4 py-1.5 sm:px-0">
+              <div className="scrollbar-hide flex items-center gap-1.5 overflow-x-auto">
+                <button
+                  onClick={() => setSelectedChannel(null)}
+                  className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors duration-200 ${
+                    selectedChannel === null
+                      ? "bg-[var(--accent)] text-white"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  All channels
+                </button>
+                {channels.map((ch) => (
+                  <button
+                    key={ch.channelId}
+                    onClick={() =>
+                      setSelectedChannel(
+                        selectedChannel === ch.channelId ? null : ch.channelId
+                      )
+                    }
+                    className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[12px] font-semibold transition-colors duration-200 ${
+                      selectedChannel === ch.channelId
+                        ? "bg-[var(--accent)] text-white"
+                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    <div className="h-[18px] w-[18px] flex-shrink-0 overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                      {ch.channelThumbnail ? (
+                        <img
+                          src={ch.channelThumbnail}
+                          alt={ch.channelName}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[9px] font-bold text-[var(--text-secondary)]">
+                          {ch.channelName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <span className="max-w-[100px] truncate">
+                      {ch.channelName}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Search bar (animated slide) */}
+          <div
+            className={`search-slide border-t border-[var(--border)] ${
+              searchOpen ? "search-slide-enter" : "search-slide-exit"
+            }`}
+          >
+            <div className="px-4 py-2 sm:px-0">
               <div className="flex items-center gap-2">
                 <svg
                   className="h-4 w-4 flex-shrink-0 text-[var(--text-muted)]"
@@ -393,7 +465,8 @@ export default function TimelinePage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by title or channel..."
                   className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
-                  autoFocus
+                  autoFocus={searchOpen}
+                  tabIndex={searchOpen ? 0 : -1}
                 />
                 {searchQuery && (
                   <button
@@ -414,7 +487,7 @@ export default function TimelinePage() {
                 )}
               </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -479,6 +552,23 @@ export default function TimelinePage() {
         videos.length > 0 &&
         filteredVideos.length === 0 && (
           <div className="flex flex-col items-center justify-center px-4 py-20">
+            {filter === "unwatched" && !searchQuery && (
+              <svg
+                className="mb-4 h-12 w-12 text-[var(--text-muted)]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 2C8.5 2 6 5 6 8v6c0 1-1 2-1 3s1 1.5 1.5 1.5c.5-.5 1-1.5 1.5-1.5s1.5 1.5 2 1.5S11 17 12 17s1.5 1.5 2 1.5 1.5-1.5 2-1.5 1 1 1.5 1.5S19 18 19 17s-1-2-1-3V8c0-3-2.5-6-6-6z"
+                />
+                <circle cx="9.5" cy="9" r="1" fill="currentColor" stroke="none" />
+                <circle cx="14.5" cy="9" r="1" fill="currentColor" stroke="none" />
+              </svg>
+            )}
             <p className="text-[15px] text-[var(--text-secondary)]">
               {searchQuery
                 ? "No videos match your search."
@@ -491,29 +581,57 @@ export default function TimelinePage() {
 
       {/* Feed */}
       {!loading && !error && filteredVideos.length > 0 && (
-        <>
+        <div
+          className="view-transition"
+          style={{ opacity: viewFading ? 0 : 1 }}
+          onTransitionEnd={() => {
+            if (!viewFading) hasAnimated.current = true;
+          }}
+        >
           {viewMode === "list" ? (
             <div>
-              {filteredVideos.map((video) => (
-                <VideoCard
+              {filteredVideos.map((video, i) => (
+                <div
                   key={video.videoId}
-                  {...video}
-                  onToggleWatched={toggleWatched}
-                />
+                  className={hasAnimated.current ? "" : "animate-feed-in"}
+                  style={
+                    hasAnimated.current
+                      ? undefined
+                      : ({
+                          "--feed-in-delay": `${Math.min(i * 50, 500)}ms`,
+                        } as React.CSSProperties)
+                  }
+                >
+                  <VideoCard
+                    {...video}
+                    onToggleWatched={toggleWatched}
+                  />
+                </div>
               ))}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 px-4 py-3 sm:px-0">
-              {filteredVideos.map((video) => (
-                <VideoCardGrid
+              {filteredVideos.map((video, i) => (
+                <div
                   key={video.videoId}
-                  {...video}
-                  onToggleWatched={toggleWatched}
-                />
+                  className={hasAnimated.current ? "" : "animate-feed-in"}
+                  style={
+                    hasAnimated.current
+                      ? undefined
+                      : ({
+                          "--feed-in-delay": `${Math.min(i * 50, 500)}ms`,
+                        } as React.CSSProperties)
+                  }
+                >
+                  <VideoCardGrid
+                    {...video}
+                    onToggleWatched={toggleWatched}
+                  />
+                </div>
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

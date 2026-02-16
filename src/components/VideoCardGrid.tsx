@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
 
 interface VideoCardGridProps {
@@ -24,6 +25,15 @@ export default function VideoCardGrid({
   watched,
   onToggleWatched,
 }: VideoCardGridProps) {
+  const pulseKey = useRef(0);
+  const [pulseCount, setPulseCount] = useState(0);
+
+  const handleToggle = useCallback(() => {
+    pulseKey.current += 1;
+    setPulseCount(pulseKey.current);
+    onToggleWatched(videoId, watched);
+  }, [videoId, watched, onToggleWatched]);
+
   const timeAgo = publishedAt
     ? formatDistanceToNow(new Date(publishedAt), { addSuffix: false })
     : "";
@@ -110,7 +120,7 @@ export default function VideoCardGrid({
         {/* Quick watched toggle */}
         <button
           type="button"
-          onClick={() => onToggleWatched(videoId, watched)}
+          onClick={handleToggle}
           className={`mt-1.5 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
             watched
               ? "text-[var(--success)] hover:text-[var(--text-secondary)]"
@@ -120,7 +130,8 @@ export default function VideoCardGrid({
         >
           {watched ? (
             <svg
-              className="h-3.5 w-3.5"
+              key={pulseCount}
+              className="h-3.5 w-3.5 animate-pulse-check"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

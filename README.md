@@ -12,8 +12,7 @@ Fully responsive -- works on both desktop and mobile.
 - **Channel preview** -- see the channel name, avatar, and handle before confirming the add
 - **Video descriptions** -- expand the description preview below each video title
 - **Mark all as watched** -- batch-mark all visible unwatched videos with one click
-- **Auto-refresh** -- background polling every 2 minutes with a "N new videos" banner
-- **Swipe gestures** -- swipe left on a video card (mobile) to toggle watched status
+- **Scheduled updates** -- feed refreshes automatically at 8 AM and 8 PM (BRT), with a next-update indicator in the toolbar
 - **Skeleton loading** -- animated placeholder cards while content loads
 - **Password protection** -- optional shared password to restrict access
 - **Dark theme** -- Bluesky-inspired dark UI
@@ -192,7 +191,7 @@ To use a custom domain (e.g. `feed.yourdomain.com`):
 - Videos are fetched via **public YouTube RSS feeds** (no API key needed)
 - Each channel has an RSS feed at `https://www.youtube.com/feeds/videos.xml?channel_id=...`
 - The feed returns the ~15 most recent videos from each channel
-- Feeds are cached for 5 minutes to avoid overloading YouTube
+- **Feed updates are scheduled at 8 AM and 8 PM (America/Sao_Paulo timezone)**. Between windows, the server returns cached data. The client automatically re-fetches when the next window arrives.
 - Subscribed channels are stored in **Cloudflare D1** (SQLite at the edge)
 - Watched video IDs are tracked in a separate D1 table
 

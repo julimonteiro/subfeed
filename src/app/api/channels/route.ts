@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllChannels, addChannel, channelExists } from "@/lib/db";
-import { resolveChannel } from "@/lib/youtube";
-import { invalidateCache } from "@/lib/cache";
+import { resolveChannel, fetchChannelFeed, type VideoEntry } from "@/lib/youtube";
+import { getCached, setCache } from "@/lib/cache";
+import { getMsUntilNextUpdate } from "@/lib/schedule";
 
 export async function GET() {
   try {
@@ -69,7 +70,23 @@ export async function POST(request: NextRequest) {
     // Add to database
     const channel = await addChannel(channelId, name, handle, thumbnailUrl);
 
-    invalidateCache("aggregated_feed");
+    // Merge new channel's videos into the existing cache instead of invalidating it
+    type CachedVideo = VideoEntry & { channelThumbnail: string | null };
+    const cached = getCached<CachedVideo[]>("aggregated_feed");
+
+    if (cached) {
+      const newVideos = await fetchChannelFeed(channelId);
+      const newVideosWithThumb: CachedVideo[] = newVideos.map((v) => ({
+        ...v,
+        channelThumbnail: thumbnailUrl,
+      }));
+      const merged = [...cached, ...newVideosWithThumb].sort(
+        (a, b) =>
+          new Date(b.publishedAt).getTime() -
+          new Date(a.publishedAt).getTime()
+      );
+      setCache("aggregated_feed", merged, getMsUntilNextUpdate());
+    }
 
     return NextResponse.json(channel, { status: 201 });
   } catch (error) {

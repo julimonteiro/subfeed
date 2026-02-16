@@ -55,3 +55,82 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-light);
 }
+
+/* --- Animations --- */
+
+@keyframes feedIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseCheck {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-feed-in {
+  opacity: 0;
+  animation: feedIn 0.35s ease-out forwards;
+  animation-delay: var(--feed-in-delay, 0ms);
+}
+
+.animate-pulse-check {
+  animation: pulseCheck 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* Search bar slide transition */
+.search-slide {
+  overflow: hidden;
+  transition: max-height 0.25s ease-out, opacity 0.2s ease-out;
+}
+
+.search-slide-enter {
+  max-height: 60px;
+  opacity: 1;
+}
+
+.search-slide-exit {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* View mode crossfade */
+.view-transition {
+  transition: opacity 0.2s ease-out;
+}
+
+/* Hide scrollbar for channel filter */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

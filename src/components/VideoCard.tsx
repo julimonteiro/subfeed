@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { useSwipe } from "@/hooks/useSwipe";
 
 interface VideoCardProps {
   videoId: string;
@@ -30,15 +29,14 @@ export default function VideoCard({
   onToggleWatched,
 }: VideoCardProps) {
   const [descExpanded, setDescExpanded] = useState(false);
+  const pulseKey = useRef(0);
+  const [pulseCount, setPulseCount] = useState(0);
 
-  const handleSwipeLeft = useCallback(() => {
+  const handleToggle = useCallback(() => {
+    pulseKey.current += 1;
+    setPulseCount(pulseKey.current);
     onToggleWatched(videoId, watched);
   }, [videoId, watched, onToggleWatched]);
-
-  const { ref: swipeRef, swipeState } = useSwipe({
-    threshold: 80,
-    onSwipeLeft: handleSwipeLeft,
-  });
 
   const timeAgo = publishedAt
     ? formatDistanceToNow(new Date(publishedAt), {
@@ -50,68 +48,9 @@ export default function VideoCard({
 
   return (
     <div
-      ref={swipeRef}
-      className={`relative overflow-hidden border-b border-[var(--border)] transition-opacity duration-200 ${watched ? "opacity-50" : ""}`}
+      className={`border-b border-[var(--border)] transition-opacity duration-200 ${watched ? "opacity-50" : ""}`}
     >
-      {/* Swipe background indicator */}
-      {swipeState.swiping && (
-        <div
-          className={`absolute inset-0 flex items-center justify-end pr-6 ${
-            watched ? "bg-[var(--bg-surface)]" : "bg-[var(--success)]/15"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {watched ? (
-              <>
-                <svg
-                  className="h-5 w-5 text-[var(--text-secondary)]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 12a9 9 0 109 9" />
-                  <path d="M3 12h6" />
-                  <path d="M12 21v-6" />
-                </svg>
-                <span className="text-[13px] font-semibold text-[var(--text-secondary)]">
-                  Undo
-                </span>
-              </>
-            ) : (
-              <>
-                <svg
-                  className="h-5 w-5 text-[var(--success)]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-                  <path d="M22 4L12 14.01l-3-3" />
-                </svg>
-                <span className="text-[13px] font-semibold text-[var(--success)]">
-                  Watched
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div
-        className="relative bg-[var(--bg-app)] transition-transform duration-150"
-        style={{
-          transform: swipeState.swiping
-            ? `translateX(${swipeState.offsetX}px)`
-            : "translateX(0)",
-        }}
-      >
-        <div className="px-4 py-3 sm:px-0">
+      <div className="px-4 py-3 sm:px-0">
           {/* Header: avatar, name, handle, time */}
           <div className="flex items-start gap-2.5">
             {/* Avatar */}
@@ -268,7 +207,7 @@ export default function VideoCard({
                 {/* Toggle watched */}
                 <button
                   type="button"
-                  onClick={() => onToggleWatched(videoId, watched)}
+                  onClick={handleToggle}
                   className={`flex items-center gap-1.5 rounded-full px-2 py-1.5 transition-colors hover:bg-[var(--bg-surface)] ${
                     watched
                       ? "text-[var(--success)] hover:text-[var(--text-secondary)]"
@@ -278,7 +217,8 @@ export default function VideoCard({
                 >
                   {watched ? (
                     <svg
-                      className="h-[18px] w-[18px]"
+                      key={pulseCount}
+                      className="h-[18px] w-[18px] animate-pulse-check"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -319,6 +259,5 @@ export default function VideoCard({
           </div>
         </div>
       </div>
-    </div>
   );
 }
