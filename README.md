@@ -4,6 +4,20 @@ A personal website to track the latest videos from your favorite YouTube channel
 
 Fully responsive -- works on both desktop and mobile.
 
+## Features
+
+- **Feed filters** -- toggle between All, Unwatched, and Watched videos
+- **Search** -- find videos by title or channel name with the collapsible search bar
+- **Grid / List view** -- switch between a detailed list and a compact thumbnail grid (persisted in localStorage)
+- **Channel preview** -- see the channel name, avatar, and handle before confirming the add
+- **Video descriptions** -- expand the description preview below each video title
+- **Mark all as watched** -- batch-mark all visible unwatched videos with one click
+- **Auto-refresh** -- background polling every 2 minutes with a "N new videos" banner
+- **Swipe gestures** -- swipe left on a video card (mobile) to toggle watched status
+- **Skeleton loading** -- animated placeholder cards while content loads
+- **Password protection** -- optional shared password to restrict access
+- **Dark theme** -- Bluesky-inspired dark UI
+
 ## Stack
 
 - **Next.js 16** (App Router) + TypeScript
@@ -180,3 +194,17 @@ To use a custom domain (e.g. `feed.yourdomain.com`):
 - The feed returns the ~15 most recent videos from each channel
 - Feeds are cached for 5 minutes to avoid overloading YouTube
 - Subscribed channels are stored in **Cloudflare D1** (SQLite at the edge)
+- Watched video IDs are tracked in a separate D1 table
+
+## API Routes
+
+| Route | Method | Description |
+|---|---|---|
+| `/api/feed` | GET | Aggregated feed from all channels |
+| `/api/channels` | GET | List all channels |
+| `/api/channels` | POST | Add a channel (by URL or pre-resolved data) |
+| `/api/channels/resolve` | POST | Resolve a YouTube URL to channel metadata (preview) |
+| `/api/channels/[id]` | DELETE | Remove a channel |
+| `/api/watched` | GET | List watched video IDs |
+| `/api/watched` | POST | Mark video(s) as watched (single or batch) |
+| `/api/auth` | GET/POST/DELETE | Authentication (check, login, logout) |

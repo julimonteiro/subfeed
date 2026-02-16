@@ -92,3 +92,14 @@ export async function unmarkVideoWatched(videoId: string): Promise<void> {
     .bind(videoId)
     .run();
 }
+
+export async function markMultipleWatched(videoIds: string[]): Promise<void> {
+  if (videoIds.length === 0) return;
+  const db = await getDB();
+  const statements = videoIds.map((id) =>
+    db
+      .prepare("INSERT OR IGNORE INTO watched_videos (video_id) VALUES (?)")
+      .bind(id)
+  );
+  await db.batch(statements);
+}

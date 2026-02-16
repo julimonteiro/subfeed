@@ -3,6 +3,7 @@ import {
   getWatchedVideoIds,
   markVideoWatched,
   unmarkVideoWatched,
+  markMultipleWatched,
 } from "@/lib/db";
 
 export async function GET() {
@@ -18,14 +19,28 @@ export async function GET() {
   }
 }
 
+interface WatchedBody {
+  videoId?: string;
+  videoIds?: string[];
+  undo?: boolean;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { videoId?: string; undo?: boolean };
+    const body = (await request.json()) as WatchedBody;
+
+    // Batch mode
+    if (Array.isArray(body.videoIds) && body.videoIds.length > 0) {
+      await markMultipleWatched(body.videoIds);
+      return NextResponse.json({ success: true });
+    }
+
+    // Single mode
     const { videoId, undo } = body;
 
     if (!videoId || typeof videoId !== "string") {
       return NextResponse.json(
-        { error: "videoId is required" },
+        { error: "videoId or videoIds is required" },
         { status: 400 }
       );
     }

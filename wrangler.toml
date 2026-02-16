@@ -4,10 +4,17 @@ name = "subfeed"
 main = ".open-next/worker.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+preview_urls = true
 
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"
+
+[[routes]]
+pattern = "subfeed.jcmonteiro.dev"
+zone_name = "jcmonteiro.dev"
+custom_domain = true
 
 [[d1_databases]]
 binding = "DB"

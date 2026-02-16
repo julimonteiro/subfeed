@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import ChannelForm from "@/components/ChannelForm";
 import ChannelList from "@/components/ChannelList";
+import { SkeletonChannelItem } from "@/components/SkeletonCard";
 
 interface Channel {
   id: number;
@@ -51,26 +52,10 @@ export default function ChannelsPage() {
 
       {/* List */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <svg
-            className="h-6 w-6 animate-spin text-[var(--accent)]"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
+        <div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonChannelItem key={i} />
+          ))}
         </div>
       ) : (
         <ChannelList channels={channels} onChannelRemoved={fetchChannels} />

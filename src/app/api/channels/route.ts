@@ -16,29 +16,49 @@ export async function GET() {
   }
 }
 
+interface AddChannelBody {
+  url?: string;
+  channelId?: string;
+  name?: string;
+  handle?: string | null;
+  thumbnailUrl?: string | null;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { url?: string };
-    const { url } = body;
+    const body = (await request.json()) as AddChannelBody;
 
-    if (!url || typeof url !== "string") {
+    let channelId: string;
+    let name: string;
+    let handle: string | null;
+    let thumbnailUrl: string | null;
+
+    if (body.channelId && body.name) {
+      // Pre-resolved data from the preview flow
+      channelId = body.channelId;
+      name = body.name;
+      handle = body.handle ?? null;
+      thumbnailUrl = body.thumbnailUrl ?? null;
+    } else if (body.url) {
+      // Legacy flow: resolve from URL
+      let normalizedUrl = body.url.trim();
+      if (!normalizedUrl.startsWith("http")) {
+        normalizedUrl = `https://${normalizedUrl}`;
+      }
+      const channelInfo = await resolveChannel(normalizedUrl);
+      channelId = channelInfo.channelId;
+      name = channelInfo.name;
+      handle = channelInfo.handle;
+      thumbnailUrl = channelInfo.thumbnailUrl;
+    } else {
       return NextResponse.json(
-        { error: "URL is required" },
+        { error: "URL or channel data is required" },
         { status: 400 }
       );
     }
 
-    // Normalize URL
-    let normalizedUrl = url.trim();
-    if (!normalizedUrl.startsWith("http")) {
-      normalizedUrl = `https://${normalizedUrl}`;
-    }
-
-    // Resolve channel info from URL
-    const channelInfo = await resolveChannel(normalizedUrl);
-
     // Check if already exists
-    const exists = await channelExists(channelInfo.channelId);
+    const exists = await channelExists(channelId);
     if (exists) {
       return NextResponse.json(
         { error: "This channel is already added" },
@@ -47,12 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Add to database
-    const channel = await addChannel(
-      channelInfo.channelId,
-      channelInfo.name,
-      channelInfo.handle,
-      channelInfo.thumbnailUrl
-    );
+    const channel = await addChannel(channelId, name, handle, thumbnailUrl);
 
     invalidateCache("aggregated_feed");
 

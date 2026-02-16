@@ -8,6 +8,7 @@ export interface VideoEntry {
   channelName: string;
   channelId: string;
   publishedAt: string;
+  description: string;
 }
 
 export interface ChannelInfo {
@@ -245,6 +246,7 @@ export async function fetchChannelFeed(
         channelName,
         channelId,
         publishedAt: (entry.published as string) || "",
+        description: (mediaGroup?.["media:description"] as string) || "",
       };
     });
   } catch (error) {
