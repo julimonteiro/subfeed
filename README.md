@@ -18,9 +18,13 @@ Fully responsive -- works on both desktop and mobile.
 
 ### 1. Prerequisites
 
-- **Node.js 18+** installed ([download](https://nodejs.org/))
+- **Node.js 18+** (includes npm) -- [download here](https://nodejs.org/)
+  - On macOS you can also install via Homebrew: `brew install node`
+  - On Ubuntu/Debian: `sudo apt install nodejs npm`
+  - On Windows: download the installer from the link above
+  - Verify installation: `node -v && npm -v`
 - **Cloudflare account** (free tier) -- [sign up here](https://dash.cloudflare.com/sign-up)
-- **Git** installed
+- **Git** installed -- [download here](https://git-scm.com/downloads)
 
 ### 2. Clone the repository and install dependencies
 
@@ -29,6 +33,8 @@ git clone <YOUR_REPOSITORY_URL>
 cd subfeed
 npm install
 ```
+
+> `npm install` downloads all project dependencies into the `node_modules/` folder. This is a one-time step (re-run only if `package.json` changes).
 
 ### 3. Log in to Cloudflare
 
