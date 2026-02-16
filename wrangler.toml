@@ -5,14 +5,9 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 # Output directory for @opennextjs/cloudflare build
-pages_build_output_dir = ".worker-next"
+pages_build_output_dir = ".open-next"
 
 [[d1_databases]]
 binding = "subfeed_db"
 database_name = "subfeed-db"
 database_id = "8ba63947-17b9-4d85-8da1-36a08f18c3ad"
-
-# Password protection (optional).
-# Set via: npx wrangler secret put SITE_PASSWORD
-# For local dev, create a .dev.vars file with: SITE_PASSWORD=your-password
-# If not set, the app is publicly accessible.
