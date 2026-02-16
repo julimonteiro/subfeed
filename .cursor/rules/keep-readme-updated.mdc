@@ -1,0 +1,18 @@
+---
+description: Keep README.md in sync whenever meaningful project changes are made
+alwaysApply: true
+---
+
+# Keep README.md Updated
+
+After making changes that affect any of the following, update `README.md` accordingly:
+
+- New or removed dependencies
+- New or changed commands / npm scripts
+- New or renamed environment variables or config files (e.g. `wrangler.toml`)
+- New pages, routes, or API endpoints
+- Changes to deployment steps or requirements
+- Database schema changes (new migrations)
+- Architecture changes (new services, providers, data flow)
+
+Do NOT update the README for purely internal refactors, style tweaks, or bug fixes that don't change usage or setup.

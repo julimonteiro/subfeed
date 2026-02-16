@@ -1,0 +1,22 @@
+---
+description: Never use emojis in code or docs -- use SVG/icon components instead
+alwaysApply: true
+---
+
+# No Emojis -- Use Icons
+
+- Never use emoji characters (unicode emoji) in source code, comments, documentation, or commit messages.
+- When a visual indicator is needed in the UI, use an SVG icon or an icon component instead.
+- In Markdown docs (README, etc.), use plain text headings and bullet points -- no emoji prefixes.
+
+Bad:
+```
+## 🚀 Getting Started
+- ✅ Step complete
+```
+
+Good:
+```
+## Getting Started
+- Step complete
+```

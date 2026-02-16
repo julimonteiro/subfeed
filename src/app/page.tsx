@@ -1,65 +1,200 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect, useCallback } from "react";
+import VideoCard from "@/components/VideoCard";
+
+interface Video {
+  videoId: string;
+  title: string;
+  link: string;
+  thumbnail: string;
+  channelName: string;
+  channelId: string;
+  channelThumbnail?: string | null;
+  publishedAt: string;
+  watched: boolean;
+}
+
+export default function TimelinePage() {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchFeed = useCallback(async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/feed");
+      if (!response.ok) throw new Error("Failed to fetch feed");
+      const data = (await response.json()) as Video[];
+      setVideos(data);
+    } catch {
+      setError("Could not load feed. Try again.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  const toggleWatched = useCallback(
+    async (videoId: string, currentlyWatched: boolean) => {
+      // Optimistic update
+      setVideos((prev) =>
+        prev.map((v) =>
+          v.videoId === videoId ? { ...v, watched: !currentlyWatched } : v
+        )
+      );
+
+      try {
+        const response = await fetch("/api/watched", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            videoId,
+            undo: currentlyWatched,
+          }),
+        });
+        if (!response.ok) throw new Error("Failed to update watched status");
+      } catch {
+        // Revert on failure
+        setVideos((prev) =>
+          prev.map((v) =>
+            v.videoId === videoId ? { ...v, watched: currentlyWatched } : v
+          )
+        );
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    fetchFeed();
+  }, [fetchFeed]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div>
+      {/* Load new posts bar */}
+      {!loading && videos.length > 0 && (
+        <button
+          onClick={() => fetchFeed(true)}
+          disabled={refreshing}
+          className="flex w-full items-center justify-center border-b border-[var(--border)] py-3 text-[14px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--bg-surface)] disabled:opacity-50"
+        >
+          {refreshing ? (
+            <span className="flex items-center gap-2">
+              <svg
+                className="h-4 w-4 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              Updating...
+            </span>
+          ) : (
+            "Load new videos"
+          )}
+        </button>
+      )}
+
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-32">
+          <svg
+            className="h-7 w-7 animate-spin text-[var(--accent)]"
+            viewBox="0 0 24 24"
+            fill="none"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
+          </svg>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && !loading && (
+        <div className="flex flex-col items-center justify-center px-4 py-32">
+          <p className="text-[15px] text-[var(--text-secondary)]">{error}</p>
+          <button
+            onClick={() => fetchFeed()}
+            className="mt-4 rounded-full bg-[var(--accent)] px-6 py-2 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
-            Documentation
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !error && videos.length === 0 && (
+        <div className="flex flex-col items-center justify-center px-4 py-32">
+          <svg
+            className="h-12 w-12 text-[var(--text-muted)]"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
+          </svg>
+          <p className="mt-4 text-[17px] font-bold text-[var(--text-primary)]">
+            Your feed is empty
+          </p>
+          <p className="mt-1.5 text-center text-[15px] leading-relaxed text-[var(--text-secondary)]">
+            Add YouTube channels to follow
+            <br />
+            the latest videos.
+          </p>
+          <a
+            href="/channels"
+            className="mt-5 rounded-full bg-[var(--accent)] px-7 py-2.5 text-[15px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)]"
+          >
+            Add channels
           </a>
         </div>
-      </main>
+      )}
+
+      {/* Feed */}
+      {!loading && !error && videos.length > 0 && (
+        <div>
+          {videos.map((video) => (
+            <VideoCard
+              key={video.videoId}
+              {...video}
+              onToggleWatched={toggleWatched}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

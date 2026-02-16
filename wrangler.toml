@@ -1,0 +1,19 @@
+#:schema node_modules/wrangler/config-schema.json
+
+name = "subfeed"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Output directory for @opennextjs/cloudflare build
+pages_build_output_dir = ".worker-next"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "subfeed-db"
+database_id = "YOUR_D1_DATABASE_ID_HERE"
+migrations_dir = "migrations"
+
+# Password protection (optional).
+# Set via: npx wrangler secret put SITE_PASSWORD
+# For local dev, create a .dev.vars file with: SITE_PASSWORD=your-password
+# If not set, the app is publicly accessible.

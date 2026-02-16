@@ -1,0 +1,12 @@
+---
+description: All generated code, comments, docs, and commit messages must be in English
+alwaysApply: true
+---
+
+# English Only in Code
+
+- All code comments must be written in English.
+- All variable names, function names, and identifiers must be in English.
+- All documentation files (README, CHANGELOG, etc.) must be written in English.
+- All git commit messages must be written in English.
+- User-facing strings (UI labels, error messages, placeholders) must also be written in English.
